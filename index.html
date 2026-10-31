@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Session Listener</title>
+    <style>
+        body { font-family: monospace; background: #121212; color: #e0e0e0; padding: 20px; }
+        input, button { padding: 8px; font-family: inherit; }
+        #log { background: #1e1e1e; padding: 10px; height: 300px; overflow-y: auto; border: 1px solid #333; margin-top: 10px; }
+        .in { color: #4caf50; }
+        .out { color: #2196f3; }
+        .err { color: #f44336; }
+        .sys { color: #ff9800; }
+    </style>
+</head>
+<body>
+    <div id="sessionBadge" style="margin-bottom: 10px; color: #ff9800;"></div>
+    <div>
+        <input type="text" id="msgInput" placeholder="Message to send..." style="width: 250px;" disabled>
+        <button id="btnSend" onclick="sendMessage()" disabled>Send</button>
+    </div>
+    <div id="log"></div>
+
+    <script>
+        // Generate or retrieve a unique session ID for this browser tab
+        let sessionId = sessionStorage.getItem('ws_session_id');
+        if (!sessionId) {
+            sessionId = 'session_' + Math.random().toString(36).substring(2, 9);
+            sessionStorage.setItem('ws_session_id', sessionId);
+        }
+
+        document.getElementById('sessionBadge').textContent = `My Session ID: ${sessionId}`;
+
+        const WS_URL = `ws://localhost:8000/?session=${sessionId}`;
+        let ws = null;
+
+        function log(msg, cls = 'sys') {
+            const div = document.createElement('div');
+            div.className = cls;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            const logBox = document.getElementById('log');
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function connect() {
+            log(`Connecting to WebSocket...`, 'sys');
+
+            try {
+                ws = new WebSocket(WS_URL);
+
+                ws.onopen = () => {
+                    log('Connected to server', 'sys');
+                    setUI(true);
+                };
+
+                ws.onmessage = (e) => {
+                    log(`SERVER: ${e.data}`, 'in');
+                };
+
+                ws.onerror = () => {
+                    log('WebSocket Error', 'err');
+                };
+
+                ws.onclose = () => {
+                    log('Disconnected', 'sys');
+                    setUI(false);
+                };
+            } catch (err) {
+                log(`Failed: ${err.message}`, 'err');
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msgInput');
+            if (ws && ws.readyState === WebSocket.OPEN && input.value) {
+                ws.send(input.value);
+                log(`CLIENT: ${input.value}`, 'out');
+                input.value = '';
+            }
+        }
+
+        function setUI(connected) {
+            document.getElementById('msgInput').disabled = !connected;
+            document.getElementById('btnSend').disabled = !connected;
+        }
+
+        document.getElementById('msgInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        window.addEventListener('DOMContentLoaded', connect);
+    </script>
+</body>
+</html>
